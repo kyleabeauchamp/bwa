@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include "bwa.h"
 
+const int map_flags = MAP_SHARED|MAP_HUGETLB|MAP_POPULATE;//|MAP_POPULATE|MAP_LOCKED;
+
 int bwa_shm_stage(bwaidx_t *idx, const char *hint, const char *_tmpfn)
 {
 	const char *name;
@@ -27,7 +29,7 @@ int bwa_shm_stage(bwaidx_t *idx, const char *hint, const char *_tmpfn)
 	}
 	if (shmid < 0) return -1;
 	ftruncate(shmid, BWA_CTL_SIZE);
-	shm = mmap(0, BWA_CTL_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, shmid, 0);
+	shm = mmap(0, BWA_CTL_SIZE, PROT_READ|PROT_WRITE, map_flags, shmid, 0);
 	cnt = (uint16_t*)shm;
 	if (to_init) {
 		memset(shm, 0, BWA_CTL_SIZE);
@@ -64,7 +66,7 @@ int bwa_shm_stage(bwaidx_t *idx, const char *hint, const char *_tmpfn)
 	memcpy(shm + cnt[1] + 8, name, l - 8);
 	cnt[1] += l; ++cnt[0];
 	ftruncate(shmid, idx->l_mem);
-	shm_idx = mmap(0, idx->l_mem, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, shmid, 0);
+	shm_idx = mmap(0, idx->l_mem, PROT_READ|PROT_WRITE, map_flags, shmid, 0);
 	if (tmpfn) {
 		FILE *fp;
 		fp = fopen(tmpfn, "rb");
@@ -98,7 +100,7 @@ bwaidx_t *bwa_idx_load_from_shm(const char *hint)
 	for (name = hint + strlen(hint) - 1; name >= hint && *name != '/'; --name);
 	++name;
 	if ((shmid = shm_open("/bwactl", O_RDONLY, 0)) < 0) return 0;
-	shm = mmap(0, BWA_CTL_SIZE, PROT_READ, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, shmid, 0);
+	shm = mmap(0, BWA_CTL_SIZE, PROT_READ, map_flags, shmid, 0);
 	cnt = (uint16_t*)shm;
 	if (cnt[0] == 0) return 0;
 	for (i = 0, p = (char*)(shm + 4); i < cnt[0]; ++i) {
@@ -110,7 +112,7 @@ bwaidx_t *bwa_idx_load_from_shm(const char *hint)
 
 	strcat(strcpy(path, "/bwaidx-"), name);
 	if ((shmid = shm_open(path, O_RDONLY, 0)) < 0) return 0;
-	shm_idx = mmap(0, l_mem, PROT_READ, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, shmid, 0);
+	shm_idx = mmap(0, l_mem, PROT_READ, map_flags, shmid, 0);
 	idx = calloc(1, sizeof(bwaidx_t));
 	bwa_mem2idx(l_mem, shm_idx, idx);
 	idx->is_shm = 1;
@@ -128,7 +130,7 @@ int bwa_shm_test(const char *hint)
 	for (name = hint + strlen(hint) - 1; name >= hint && *name != '/'; --name);
 	++name;
 	if ((shmid = shm_open("/bwactl", O_RDONLY, 0)) < 0) return 0;
-	shm = mmap(0, BWA_CTL_SIZE, PROT_READ, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, shmid, 0);
+	shm = mmap(0, BWA_CTL_SIZE, PROT_READ, map_flags, shmid, 0);
 	cnt = (uint16_t*)shm;
 	for (i = 0, p = shm + 4; i < cnt[0]; ++i) {
 		if (strcmp(p + 8, name) == 0) return 1;
@@ -143,7 +145,7 @@ int bwa_shm_list(void)
 	uint16_t *cnt, i;
 	char *p, *shm;
 	if ((shmid = shm_open("/bwactl", O_RDONLY, 0)) < 0) return -1;
-	shm = mmap(0, BWA_CTL_SIZE, PROT_READ, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, shmid, 0);
+	shm = mmap(0, BWA_CTL_SIZE, PROT_READ, map_flags, shmid, 0);
 	cnt = (uint16_t*)shm;
 	for (i = 0, p = shm + 4; i < cnt[0]; ++i) {
 		int64_t l_mem;
@@ -162,7 +164,7 @@ int bwa_shm_destroy(void)
 	char path[PATH_MAX + 1];
 
 	if ((shmid = shm_open("/bwactl", O_RDONLY, 0)) < 0) return -1;
-	shm = mmap(0, BWA_CTL_SIZE, PROT_READ, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, shmid, 0);
+	shm = mmap(0, BWA_CTL_SIZE, PROT_READ, map_flags, shmid, 0);
 	cnt = (uint16_t*)shm;
 	for (i = 0, p = shm + 4; i < cnt[0]; ++i) {
 		int64_t l_mem;
